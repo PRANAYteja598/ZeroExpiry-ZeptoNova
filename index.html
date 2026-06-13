@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ZeroExpiry — Dark Store Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #070B14; color: #CBD5E1; font-family: 'Inter', sans-serif; min-height: 100vh; }
+  button { cursor: pointer; font-family: inherit; }
+  button:disabled { cursor: not-allowed; }
+
+  @keyframes scanBeam {
+    0%   { top: 4%; opacity: 0; }
+    8%   { opacity: 1; }
+    92%  { opacity: 1; }
+    100% { top: 94%; opacity: 0; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.35; }
+    50%       { opacity: 1; }
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateX(18px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 6px currentColor; }
+    50%       { box-shadow: 0 0 16px currentColor; }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  /* ── Top bar ── */
+  #topbar {
+    background: #0A0F1E;
+    border-bottom: 1px solid #1C2333;
+    padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 34px; height: 34px; border-radius: 7px;
+    background: linear-gradient(135deg, #F59E0B, #D97706);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .logo-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; font-size: 15px; color: #F1F5F9; letter-spacing: 1px;
+  }
+  .logo-name span { color: #F59E0B; }
+  .logo-sub { font-size: 10px; color: #475569; letter-spacing: 2px; margin-top: 1px; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #10B981;
+    box-shadow: 0 0 8px #10B981; animation: glowPulse 2s ease-in-out infinite;
+    color: #10B981;
+  }
+  .status-wrap { display: flex; align-items: center; gap: 8px; }
+  .status-label { font-size: 11px; color: #475569; font-family: monospace; letter-spacing: 1px; }
+
+  /* ── Main layout ── */
+  #main {
+    display: flex; gap: 20px;
+    max-width: 1120px; margin: 0 auto;
+    padding: 24px 20px;
+    flex-wrap: wrap;
+  }
+  #left  { flex: 1 1 360px; display: flex; flex-direction: column; gap: 12px; }
+  #right { flex: 1 1 340px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ── Card ── */
+  .card {
+    background: #0A0F1E;
+    border: 1px solid #1C2333;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid #1C2333;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title { font-size: 11px; letter-spacing: 2px; color: #64748B; font-family: monospace; }
+  .card-meta  { font-size: 10px; color: #475569; font-family: monospace; }
+
+  /* ── Scan zone ── */
+  #scan-zone {
+    position: relative; height: 270px;
+    background: #070B14;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; cursor: pointer;
+  }
+  #scan-zone video, #scan-zone img#preview-img {
+    width: 100%; height: 100%; object-fit: cover;
+    position: absolute; top: 0; left: 0;
+  }
+  #scan-zone canvas#preview-canvas {
+    display: none;
+  }
+  .corner {
+    position: absolute; width: 18px; height: 18px;
+    border-color: #F59E0B; border-style: solid; border-width: 0; z-index: 5;
+    pointer-events: none;
+  }
+  .corner.tl { top: 10px; left: 10px;  border-top-width: 2px; border-left-width: 2px; }
+  .corner.tr { top: 10px; right: 10px; border-top-width: 2px; border-right-width: 2px; }
+  .corner.bl { bottom: 10px; left: 10px;  border-bottom-width: 2px; border-left-width: 2px; }
+  .corner.br { bottom: 10px; right: 10px; border-bottom-width: 2px; border-right-width: 2px; }
+
+  #beam {
+    display: none;
+    position: absolute; left: 0; right: 0; height: 3px; z-index: 6;
+    background: linear-gradient(90deg, transparent, #F59E0B, #FCD34D, #F59E0B, transparent);
+    box-shadow: 0 0 18px 4px #F59E0BAA;
+    animation: scanBeam 1.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  #beam.active { display: block; }
+
+  #upload-hint {
+    text-align: center; z-index: 2; pointer-events: none;
+  }
+  #upload-hint .icon { font-size: 40px; opacity: 0.18; margin-bottom: 10px; }
+  #upload-hint .text { color: #334155; font-size: 13px; }
+  #upload-hint .sub  { color: #1E293B; font-size: 11px; margin-top: 4px; }
+
+  #progress-overlay {
+    display: none;
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #070B14CC; padding: 10px 16px; z-index: 7;
+  }
+  #progress-overlay.active { display: block; }
+  .prog-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .prog-label { font-size: 11px; color: #F59E0B; font-family: monospace; letter-spacing: 1px; }
+  .prog-pct   { font-size: 11px; color: #F59E0B; font-family: monospace; }
+  .prog-track { background: #1C2333; border-radius: 4px; height: 4px; overflow: hidden; }
+  #prog-bar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #D97706, #F59E0B, #FCD34D);
+    border-radius: 4px; transition: width 0.1s;
+    box-shadow: 0 0 8px #F59E0B88;
+  }
+
+  /* ── OCR status ── */
+  #ocr-status {
+    display: none;
+    font-size: 11px; color: #64748B; font-family: monospace;
+    padding: 0 16px 10px; font-style: italic;
+  }
+  #ocr-status.active { display: block; }
+
+  /* ── Buttons ── */
+  .btn-row { display: flex; gap: 10px; }
+  #btn-scan {
+    flex: 1; padding: 12px 0;
+    background: linear-gradient(135deg, #D97706, #F59E0B);
+    border: none; border-radius: 8px;
+    color: #0A0F1E; font-weight: 700; font-size: 13px; letter-spacing: 1px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  #btn-scan:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  #btn-scan:disabled { background: #1C2333; color: #475569; }
+
+  #btn-reset {
+    padding: 12px 16px;
+    background: transparent; border: 1px solid #1C2333;
+    border-radius: 8px; color: #475569; font-size: 16px;
+    font-family: monospace; transition: border-color 0.2s, color 0.2s;
+    display: none;
+  }
+  #btn-reset:hover { border-color: #334155; color: #94A3B8; }
+  #btn-reset.show { display: block; }
+
+  #btn-camera {
+    width: 100%; padding: 10px 0; margin-top: 2px;
+    background: transparent; border: 1px solid #1C2333;
+    border-radius: 8px; color: #475569; font-size: 12px; letter-spacing: 1px;
+    font-family: monospace; transition: border-color 0.2s, color 0.2s;
+  }
+  #btn-camera:hover { border-color: #F59E0B55; color: #F59E0B; }
+
+  #btn-upload {
+    width: 100%; padding: 10px 0;
+    background: transparent; border: 1px dashed #1C2333;
+    border-radius: 8px; color: #334155; font-size: 12px; letter-spacing: 1px;
+    font-family: monospace; transition: border-color 0.2s, color 0.2s;
+  }
+  #btn-upload:hover { border-color: #334155; color: #475569; }
+
+  /* ── Lot verdict ── */
+  #lot-verdict { display: none; padding: 14px 18px; border-radius: 8px; }
+  #lot-verdict.show { display: flex; align-items: center; gap: 12px; }
+  .verdict-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .verdict-label { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; letter-spacing: 1px; }
+  .verdict-sub   { font-size: 11px; color: #475569; margin-top: 3px; }
+
+  /* ── Stats row ── */
+  #stats-row { display: none; gap: 8px; }
+  #stats-row.show { display: flex; }
+  .stat-pill {
+    flex: 1; padding: 10px 8px;
+    background: #0A0F1E; border-radius: 8px; text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid transparent;
+  }
+  .stat-num   { font-size: 22px; font-weight: 700; }
+  .stat-label { font-size: 10px; letter-spacing: 1px; color: #475569; margin-top: 2px; }
+
+  /* ── Report list ── */
+  #report-body {
+    padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 310px;
+  }
+  #report-empty {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 60px 20px; text-align: center;
+  }
+  #report-empty .icon { font-size: 34px; opacity: 0.12; margin-bottom: 12px; }
+  #report-empty .text { color: #1E293B; font-size: 13px; }
+
+  #report-scanning {
+    display: none; flex: 1;
+    align-items: center; justify-content: center; padding: 60px 20px;
+  }
+  #report-scanning.active { display: flex; }
+  .scanning-text {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #334155;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  .product-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 6px; border: 1px solid #1C2333;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0; transform: translateX(20px);
+    transition: opacity 0.35s ease, transform 0.35s ease, background 0.2s, border-color 0.2s;
+  }
+  .product-row.visible { opacity: 1; transform: translateX(0); }
+
+  .risk-badge {
+    min-width: 28px; height: 28px; border-radius: 4px;
+    border: 1px solid; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .prod-name {
+    color: #E2E8F0; font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .prod-meta { color: #64748B; font-size: 11px; margin-top: 2px; }
+  .days-left  { font-size: 15px; font-weight: 700; text-align: right; }
+  .risk-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; opacity: 0.8; }
+
+  /* ── Export button ── */
+  #btn-export {
+    display: none; width: 100%; padding: 11px 0; margin-top: 4px;
+    background: transparent; border: 1px solid #1C2333;
+    border-radius: 8px; color: #475569; font-size: 12px; letter-spacing: 1px;
+    font-family: monospace; transition: border-color 0.2s, color 0.2s;
+  }
+  #btn-export.show { display: block; }
+  #btn-export:hover { border-color: #F59E0B55; color: #F59E0B; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid #0F1624;
+    padding: 12px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px;
+  }
+  footer span { font-size: 10px; color: #1E293B; font-family: monospace; letter-spacing: 1px; }
+
+  /* ── Camera stop btn ── */
+  #btn-stop-camera {
+    display: none; width: 100%; padding: 10px 0; margin-top: 2px;
+    background: transparent; border: 1px solid #EF444433;
+    border-radius: 8px; color: #EF4444; font-size: 12px; letter-spacing: 1px;
+    font-family: monospace; transition: all 0.2s;
+  }
+  #btn-stop-camera.show { display: block; }
+  #btn-stop-camera:hover { background: #EF444411; }
+
+  @media (max-width: 600px) {
+    #main { padding: 16px 12px; gap: 14px; }
+    .stat-num { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo-wrap">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-name">ZERO<span>EXPIRY</span></div>
+      <div class="logo-sub">DARK STORE INTELLIGENCE · v1.0</div>
+    </div>
+  </div>
+  <div class="status-wrap">
+    <div class="status-dot"></div>
+    <span class="status-label">SYSTEM ONLINE</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT -->
+  <div id="left">
+
+    <!-- Scan zone card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">BATCH SCAN ZONE</span>
+        <span class="card-meta" id="scan-complete-label"></span>
+      </div>
+      <div id="scan-zone" onclick="handleZoneClick()">
+        <!-- corners -->
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <!-- scan beam -->
+        <div id="beam"></div>
+        <!-- preview image -->
+        <img id="preview-img" style="display:none;" alt="batch preview"/>
+        <!-- live camera -->
+        <video id="camera-video" autoplay playsinline muted style="display:none;"></video>
+        <!-- canvas for capture -->
+        <canvas id="preview-canvas"></canvas>
+        <!-- upload hint -->
+        <div id="upload-hint">
+          <div class="icon">📦</div>
+          <div class="text">Tap to upload shelf image</div>
+          <div class="sub">Or use live camera below · JPG, PNG supported</div>
+        </div>
+        <!-- progress overlay -->
+        <div id="progress-overlay">
+          <div class="prog-row">
+            <span class="prog-label" id="prog-label">SCANNING BATCH...</span>
+            <span class="prog-pct" id="prog-pct">0%</span>
+          </div>
+          <div class="prog-track"><div id="prog-bar"></div></div>
+        </div>
+      </div>
+      <div id="ocr-status"></div>
+    </div>
+
+    <!-- hidden file input -->
+    <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleFileUpload(event)"/>
+
+    <!-- Buttons -->
+    <div class="btn-row">
+      <button id="btn-scan" onclick="startScan()">▶ RUN SCAN</button>
+      <button id="btn-reset" onclick="resetAll()">↺</button>
+    </div>
+    <button id="btn-camera" onclick="toggleCamera()">📷 USE LIVE CAMERA</button>
+    <button id="btn-stop-camera" onclick="stopCamera()">■ STOP CAMERA</button>
+    <button id="btn-upload" onclick="document.getElementById('file-input').click()">+ UPLOAD SHELF IMAGE</button>
+
+    <!-- Lot verdict -->
+    <div id="lot-verdict"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div id="right">
+    <!-- Stats -->
+    <div id="stats-row">
+      <div class="stat-pill" id="stat-total" style="border-color:#64748B33">
+        <div class="stat-num" style="color:#64748B" id="sn-total">0</div>
+        <div class="stat-label">TOTAL</div>
+      </div>
+      <div class="stat-pill" id="stat-safe" style="border-color:#10B98133">
+        <div class="stat-num" style="color:#10B981" id="sn-safe">0</div>
+        <div class="stat-label">SAFE</div>
+      </div>
+      <div class="stat-pill" id="stat-risk" style="border-color:#F59E0B33">
+        <div class="stat-num" style="color:#F59E0B" id="sn-risk">0</div>
+        <div class="stat-label">AT RISK</div>
+      </div>
+      <div class="stat-pill" id="stat-exp" style="border-color:#EF444433">
+        <div class="stat-num" style="color:#EF4444" id="sn-exp">0</div>
+        <div class="stat-label">EXPIRED</div>
+      </div>
+    </div>
+
+    <!-- Report card -->
+    <div class="card" style="flex:1">
+      <div class="card-header">
+        <span class="card-title">INWARDING REPORT</span>
+        <span class="card-meta" id="report-meta"></span>
+      </div>
+      <div id="report-body">
+        <div id="report-empty">
+          <div class="icon">🔍</div>
+          <div class="text">Run a scan to generate the inwarding report</div>
+        </div>
+        <div id="report-scanning">
+          <span class="scanning-text">Reading expiry dates...</span>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-export" onclick="exportReport()">↓ EXPORT INWARDING REPORT</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span>ZEROEXPIRY · ZEPTO NOVA · FSSAI FOOD SAFETY INNOVATION CHALLENGE</span>
+  <span>AI · CV · AUTOMATION</span>
+</footer>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const RISK = {
+  EXPIRED:  { color:"#EF4444", bg:"#2D0A0A", border:"#EF444455", label:"EXPIRED",       icon:"✕" },
+  CRITICAL: { color:"#F97316", bg:"#2D1400", border:"#F9731655", label:"CRITICAL",       icon:"!" },
+  WARNING:  { color:"#F59E0B", bg:"#2D1F00", border:"#F59E0B55", label:"EXPIRING SOON",  icon:"⚠" },
+  SAFE:     { color:"#10B981", bg:"#002D1A", border:"#10B98155", label:"SAFE",           icon:"✓" },
+};
+
+// Demo product dataset (in real deployment this comes from OCR + DB lookup)
+const DEMO_PRODUCTS = [
+  { name:"Amul Milk 500ml",      expiry:"2025-06-10", batch:"B2024-441" },
+  { name:"Britannia Bread",      expiry:"2026-06-18", batch:"B2026-112" },
+  { name:"Lay's Classic 50g",    expiry:"2026-09-01", batch:"B2026-309" },
+  { name:"Maggi Noodles 70g",    expiry:"2026-06-13", batch:"B2026-201" },
+  { name:"Dahi 400g",            expiry:"2026-06-14", batch:"B2026-198" },
+  { name:"Tropicana Orange 1L",  expiry:"2026-07-22", batch:"B2026-277" },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let cameraStream = null;
+let scanning = false;
+let hasImage = false;
+let progressTimer = null;
+let batchId = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getDaysLeft(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.ceil((new Date(dateStr) - today) / 86400000);
+}
+function getRisk(d) {
+  if (d < 0)  return "EXPIRED";
+  if (d <= 3) return "CRITICAL";
+  if (d <= 7) return "WARNING";
+  return "SAFE";
+}
+function randBatch() { return Math.floor(Math.random()*9000)+1000; }
+
+// ─── Camera ───────────────────────────────────────────────────────────────────
+async function toggleCamera() {
+  if (cameraStream) { stopCamera(); return; }
+  try {
+    // prefer rear camera on mobile
+    const constraints = {
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    };
+    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('camera-video');
+    video.srcObject = cameraStream;
+    video.style.display = 'block';
+    document.getElementById('preview-img').style.display = 'none';
+    document.getElementById('upload-hint').style.display = 'none';
+    document.getElementById('btn-camera').style.display = 'none';
+    document.getElementById('btn-upload').style.display = 'none';
+    document.getElementById('btn-stop-camera').classList.add('show');
+    document.getElementById('btn-reset').classList.add('show');
+    hasImage = true;
+    setOcrStatus('📷 Live camera active — position shelf in frame, then hit RUN SCAN');
+  } catch(e) {
+    setOcrStatus('⚠ Camera access denied. Please allow camera permission and try again.');
+  }
+}
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const video = document.getElementById('camera-video');
+  video.style.display = 'none';
+  video.srcObject = null;
+  document.getElementById('btn-stop-camera').classList.remove('show');
+  document.getElementById('btn-camera').style.display = 'block';
+  document.getElementById('btn-upload').style.display = 'block';
+  hasImage = false;
+  setOcrStatus('');
+}
+
+// ─── File upload ──────────────────────────────────────────────────────────────
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('preview-img');
+  img.src = url; img.style.display = 'block';
+  document.getElementById('upload-hint').style.display = 'none';
+  document.getElementById('btn-reset').classList.add('show');
+  hasImage = true;
+  setOcrStatus('✓ Image loaded — hit RUN SCAN to analyse');
+  // stop camera if running
+  if (cameraStream) stopCamera();
+}
+
+function handleZoneClick() {
+  if (scanning) return;
+  if (!hasImage && !cameraStream) {
+    document.getElementById('file-input').click();
+  }
+}
+
+// ─── OCR status ───────────────────────────────────────────────────────────────
+function setOcrStatus(msg) {
+  const el = document.getElementById('ocr-status');
+  el.textContent = msg;
+  el.classList.toggle('active', !!msg);
+}
+
+// ─── Scan ─────────────────────────────────────────────────────────────────────
+asyn
