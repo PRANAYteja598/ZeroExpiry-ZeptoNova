@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ZeroExpiry — Zepto Nova</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04070F;
+  --surface:#080E1C;
+  --card:#0C1424;
+  --border:#162035;
+  --border2:#1E2E47;
+  --amber:#F5A623;
+  --amber2:#FFD166;
+  --green:#00E5A0;
+  --red:#FF4566;
+  --orange:#FF8C42;
+  --blue:#4DA8FF;
+  --text:#E8EEF8;
+  --muted:#4A6080;
+  --dim:#1A2840;
+}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;overflow-x:hidden}
+button{cursor:pointer;font-family:'Space Grotesk',sans-serif;border:none;outline:none}
+button:disabled{cursor:not-allowed;opacity:0.4}
+
+/* ANIMATIONS */
+@keyframes beam{0%{top:2%;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:96%;opacity:0}}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes glow{0%,100%{box-shadow:0 0 8px var(--amber)}50%{box-shadow:0 0 22px var(--amber),0 0 40px var(--amber)44}}
+@keyframes slideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes ripple{0%{transform:scale(0);opacity:1}100%{transform:scale(4);opacity:0}}
+
+/* TOPBAR */
+#topbar{
+  background:linear-gradient(180deg,#0A1020 0%,#080E1C 100%);
+  border-bottom:1px solid var(--border2);
+  padding:14px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;
+  backdrop-filter:blur(20px);
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-badge{
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,#FF8C42,#F5A623);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;box-shadow:0 4px 20px #F5A62344;
+  animation:float 3s ease-in-out infinite;
+}
+.logo-text{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;letter-spacing:2px}
+.logo-text span{
+  background:linear-gradient(90deg,#F5A623,#FFD166);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:3px;margin-top:1px;font-family:'JetBrains Mono',monospace}
+.online{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:glow 2s ease-in-out infinite}
+.online-txt{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+
+/* HERO STRIP */
+#hero{
+  background:linear-gradient(135deg,#0C1830 0%,#08121E 50%,#0A0E1A 100%);
+  border-bottom:1px solid var(--border);
+  padding:20px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;
+}
+.hero-txt h1{font-size:22px;font-weight:700;line-height:1.2}
+.hero-txt h1 span{
+  background:linear-gradient(90deg,#F5A623,#FFD166,#FF8C42);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-txt p{font-size:13px;color:var(--muted);margin-top:6px}
+.hero-badge{
+  background:linear-gradient(135deg,#F5A62322,#FF8C4211);
+  border:1px solid #F5A62333;
+  padding:8px 16px;border-radius:20px;
+  font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;letter-spacing:1px;
+  white-space:nowrap;
+}
+
+/* MAIN */
+#main{display:flex;gap:16px;padding:20px 16px;max-width:1100px;margin:0 auto;flex-wrap:wrap}
+#left{flex:1 1 340px;display:flex;flex-direction:column;gap:12px}
+#right{flex:1 1 320px;display:flex;flex-direction:column;gap:12px}
+
+/* CARDS */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;
+  box-shadow:0 4px 24px #00000044;
+}
+.card-head{
+  padding:12px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg,#0F1828 0%,transparent 100%);
+}
+.card-title{font-size:10px;letter-spacing:3px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.card-badge{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+
+/* SCAN ZONE */
+#zone{
+  position:relative;height:280px;
+  background:radial-gradient(ellipse at center,#0F1E35 0%,#04070F 100%);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;cursor:pointer;
+}
+#zone video,#zone #prev{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+#zone #prev{display:none}
+#zone video{display:none}
+
+/* grid overlay */
+#zone::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:40px 40px;opacity:0.3;pointer-events:none;z-index:1;
+}
+
+.corner{position:absolute;width:22px;height:22px;z-index:10;pointer-events:none}
+.corner.tl{top:12px;left:12px;border-top:2px solid var(--amber);border-left:2px solid var(--amber)}
+.corner.tr{top:12px;right:12px;border-top:2px solid var(--amber);border-right:2px solid var(--amber)}
+.corner.bl{bottom:12px;left:12px;border-bottom:2px solid var(--amber);border-left:2px solid var(--amber)}
+.corner.br{bottom:12px;right:12px;border-bottom:2px solid var(--amber);border-right:2px solid var(--amber)}
+
+#beam{
+  display:none;position:absolute;left:0;right:0;height:2px;z-index:8;
+  background:linear-gradient(90deg,transparent 0%,var(--amber) 30%,var(--amber2) 50%,var(--amber) 70%,transparent 100%);
+  box-shadow:0 0 20px 6px #F5A62366,0 0 40px 10px #F5A62322;
+  animation:beam 2s ease-in-out infinite;pointer-events:none;
+}
+#beam.on{display:block}
+
+#hint{text-align:center;z-index:2;pointer-events:none;padding:20px}
+#hint .ic{font-size:48px;opacity:0.15;margin-bottom:12px;display:block;animation:float 3s ease-in-out infinite}
+#hint .t{color:#2A4060;font-size:14px;font-weight:500}
+#hint .s{color:#162035;font-size:12px;margin-top:6px}
+
+#prog-wrap{
+  display:none;position:absolute;bottom:0;left:0;right:0;
+  background:linear-gradient(0deg,#04070FEE,#04070F88);
+  padding:12px 18px;z-index:9;
+}
+#prog-wrap.on{display:block}
+.prog-row{display:flex;justify-content:space-between;margin-bottom:8px}
+.prog-lbl{font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.prog-pct{font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace}
+.prog-track{height:3px;background:var(--dim);border-radius:3px;overflow:hidden}
+#prog-bar{
+  height:100%;width:0%;border-radius:3px;
+  background:linear-gradient(90deg,#D97706,#F5A623,#FFD166);
+  box-shadow:0 0 10px #F5A62388;transition:width 0.12s;
+}
+#stage-msg{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:6px;animation:pulse 1s infinite}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:10px}
+#bScan{
+  flex:1;padding:14px;border-radius:12px;
+  background:linear-gradient(135deg,#D97706,#F5A623,#FFD166);
+  color:#0A0700;font-weight:700;font-size:14px;letter-spacing:1px;
+  font-family:'JetBrains Mono',monospace;
+  box-shadow:0 4px 20px #F5A62344;
+  transition:all 0.2s;position:relative;overflow:hidden;
+}
+#bScan:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 30px #F5A62366}
+#bScan:active:not(:disabled){transform:translateY(0)}
+#bScan:disabled{background:var(--dim);color:var(--muted);box-shadow:none}
+
+#bReset{
+  padding:14px 18px;border-radius:12px;
+  background:transparent;border:1px solid var(--border2);
+  color:var(--muted);font-size:18px;
+  transition:all 0.2s;display:none;
+}
+#bReset:hover{border-color:var(--red);color:var(--red)}
+#bReset.on{display:block}
+
+.btn-sec{
+  width:100%;padding:12px;border-radius:12px;
+  background:transparent;border:1px solid var(--border2);
+  color:var(--muted);font-size:12px;letter-spacing:1px;
+  font-family:'JetBrains Mono',monospace;
+  transition:all 0.2s;
+}
+.btn-sec:hover{border-color:var(--amber);color:var(--amber);background:#F5A62308}
+#bStopCam{border-color:#FF456622;color:var(--red);display:none}
+#bStopCam:hover{background:#FF456611}
+#bStopCam.on{display:block}
+
+/* STATUS BAR */
+#statusBar{
+  padding:10px 18px;
+  font-size:11px;color:var(--muted);
+  font-family:'JetBrains Mono',monospace;
+  border-top:1px solid var(--border);
+  min-height:36px;display:none;
+  background:linear-gradient(180deg,transparent,#04070F44);
+}
+#statusBar.on{display:block}
+
+/* VERDICT */
+#verdict{
+  display:none;padding:16px 18px;border-radius:14px;
+  animation:slideIn 0.4s ease;
+}
+#verdict.on{display:flex;align-items:center;gap:14px}
+.v-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.v-label{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;letter-spacing:2px}
+.v-sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* STATS */
+#stats{display:none;gap:10px}
+#stats.on{display:flex}
+.stat{
+  flex:1;padding:14px 10px;border-radius:12px;text-align:center;
+  background:var(--card);border:1px solid var(--border);
+  transition:all 0.3s;
+}
+.stat:hover{transform:translateY(-2px)}
+.stat-n{font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.stat-l{font-size:9px;letter-spacing:2px;color:var(--muted);margin-top:4px}
+
+/* REPORT */
+#rBody{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:320px}
+#rEmpty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center}
+#rEmpty .ic{font-size:36px;opacity:0.1;margin-bottom:12px;display:block}
+#rEmpty .t{color:#162035;font-size:13px}
+#rScanning{display:none;flex:1;align-items:center;justify-content:center;padding:60px 20px}
+#rScanning.on{display:flex}
+.spin-ring{
+  width:40px;height:40px;border-radius:50%;
+  border:3px solid var(--border2);border-top-color:var(--amber);
+  animation:spin 0.8s linear infinite;margin-bottom:16px;
+}
+
+.prow{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:10px;border:1px solid var(--border);
+  font-family:'JetBrains Mono',monospace;
+  opacity:0;transform:translateY(10px);
+  transition:opacity 0.35s ease,transform 0.35s ease;
+  position:relative;overflow:hidden;
+}
+.prow.vis{opacity:1;transform:translateY(0)}
+.prow::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:3px 0 0 3px;
+}
+.pbadge{
+  min-width:30px;height:30px;border-radius:8px;
+  border:1px solid;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;flex-shrink:0;
+}
+.pname{color:var(--text);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmeta{font-size:10px;color:var(--muted);margin-top:3px}
+.pdays{font-size:16px;font-weight:700;text-align:right}
+.prisk{font-size:8px;font-weight:700;letter-spacing:2px;opacity:0.8}
+
+/* EXPORT */
+#bExport{
+  display:none;width:100%;padding:13px;border-radius:12px;
+  background:transparent;border:1px solid var(--border2);
+  color:var(--muted);font-size:12px;letter-spacing:1px;
+  font-family:'JetBrains Mono',monospace;transition:all 0.2s;
+}
+#bExport.on{display:block}
+#bExport:hover{border-color:var(--green);color:var(--green);background:#00E5A008}
+
+/* FOOTER */
+footer{
+  border-top:1px solid var(--border);padding:14px 24px;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+  margin-top:8px;
+}
+footer span{font-size:10px;color:#0F1E30;font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+
+/* MOBILE */
+@media(max-width:600px){
+  #main{padding:14px 10px;gap:12px}
+  .stat-n{font-size:20px}
+  #zone{height:240px}
+  .hero-txt h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-badge">⚡</div>
+    <div>
+      <div class="logo-text">ZERO<span>EXPIRY</span></div>
+      <div class="logo-sub">DARK STORE INTELLIGENCE</div>
+    </div>
+  </div>
+  <div class="online">
+    <div class="dot"></div>
+    <span class="online-txt">LIVE</span>
+  </div>
+</div>
+
+<div id="hero">
+  <div class="hero-txt">
+    <h1>AI-Powered <span>Batch Expiry Scanner</span></h1>
+    <p>Scan entire shelves instantly · Auto-generate inwarding reports · Zero expired stock</p>
+  </div>
+  <div class="hero-badge">⚡ ZEPTO NOVA · FSSAI 2026</div>
+</div>
+
+<div id="main">
+
+  <!-- LEFT -->
+  <div id="left">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">BATCH SCAN ZONE</span>
+        <span class="card-badge" id="scanMeta"></span>
+      </div>
+      <div id="zone" onclick="zoneClick()">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div id="beam"></div>
+        <img id="prev" alt="preview"/>
+        <video id="vid" autoplay playsinline muted></video>
+        <div id="hint">
+          <span class="ic">📦</span>
+          <div class="t">Tap to upload shelf image</div>
+          <div class="s">Multi-product batches · JPG, PNG</div>
+        </div>
+        <div id="prog-wrap">
+          <div class="prog-row">
+            <span class="prog-lbl">SCANNING BATCH</span>
+            <span class="prog-pct" id="pct">0%</span>
+          </div>
+          <div class="prog-track"><div id="prog-bar"></div></div>
+          <div id="stage-msg"></div>
+        </div>
+      </div>
+      <div id="statusBar"></div>
+    </div>
+
+    <input type="file" id="fInput" accept="image/*" style="display:none" onchange="onFile(event)"/>
+
+    <div class="btn-row">
+      <button id="bScan" onclick="startScan()">▶ RUN SCAN</button>
+      <button id="bReset" onclick="resetAll()">✕</button>
+    </div>
+    <button class="btn-sec" id="bCam" onclick="toggleCam()">📷 USE LIVE CAMERA</button>
+    <button class="btn-sec" id="bStopCam" onclick="stopCam()">■ STOP CAMERA</button>
+    <button class="btn-sec" id="bUp" onclick="document.getElementById('fInput').click()">↑ UPLOAD SHELF IMAGE</button>
+
+    <div id="verdict"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div id="right">
+    <div id="stats">
+      <div class="stat" style="border-color:#4A608033">
+        <div class="stat-n" style="color:var(--muted)" id="sTotal">0</div>
+        <div class="stat-l">TOTAL</div>
+      </div>
+      <div class="stat" style="border-color:#00E5A033">
+        <div class="stat-n" style="color:var(--green)" id="sSafe">0</div>
+        <div class="stat-l">SAFE</div>
+      </div>
+      <div class="stat" style="border-color:#F5A62333">
+        <div class="stat-n" style="color:var(--amber)" id="sRisk">0</div>
+        <div class="stat-l">AT RISK</div>
+      </div>
+      <div class="stat" style="border-color:#FF456633">
+        <div class="stat-n" style="color:var(--red)" id="sExp">0</div>
+        <div class="stat-l">EXPIRED</div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1">
+      <div class="card-head">
+        <span class="card-title">INWARDING REPORT</span>
+        <span class="card-badge" id="rMeta"></span>
+      </div>
+      <div id="rBody">
+        <div id="rEmpty">
+          <span class="ic">🔍</span>
+          <div class="t">Run a scan to generate report</div>
+        </div>
+        <div id="rScanning">
+          <div style="text-align:center">
+            <div class="spin-ring" style="margin:0 auto 16px"></div>
+            <div style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;animation:pulse 1s infinite">Reading expiry dates...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button id="bExport" onclick="exportRep()">↓ EXPORT INWARDING REPORT (.txt)</button>
+  </div>
+</div>
+
+<footer>
+  <span>ZEROEXPIRY · ZEPTO NOVA · FSSAI FOOD SAFETY INNOVATION</span>
+  <span>AI · CV · AUTOMATION</span>
+</footer>
+
+<script>
+const PRODUCTS=[
+  {name:"Amul Milk 500ml",     expiry:"2025-06-10",batch:"B2024-441"},
+  {name:"Britannia Bread",     expiry:"2026-06-18",batch:"B2026-112"},
+  {name:"Lay's Classic 50g",   expiry:"2026-09-01",batch:"B2026-309"},
+  {name:"Maggi Noodles 70g",   expiry:"2026-06-13",batch:"B2026-201"},
+  {name:"Dahi 400g",           expiry:"2026-06-14",batch:"B2026-198"},
+  {name:"Tropicana Orange 1L", expiry:"2026-07-22",batch:"B2026-277"},
+];
+
+const RISK={
+  EXPIRED: {c:"#FF4566",bg:"#1A0510",bc:"#FF456633",lbl:"EXPIRED",    ic:"✕"},
+  CRITICAL:{c:"#FF8C42",bg:"#1A0B00",bc:"#FF8C4233",lbl:"CRITICAL",   ic:"!"},
+  WARNING: {c:"#F5A623",bg:"#1A1000",bc:"#F5A62333",lbl:"NEAR EXPIRY",ic:"⚠"},
+  SAFE:    {c:"#00E5A0",bg:"#001A12",bc:"#00E5A033",lbl:"SAFE",       ic:"✓"},
+};
+
+let camStream=null,scanning=false,hasMedia=false,timer=null,bId=null;
+
+function days(d){const t=new Date();t.setHours(0,0,0,0);return Math.ceil((new Date(d)-t)/86400000)}
+function risk(d){return d<0?"EXPIRED":d<=3?"CRITICAL":d<=7?"WARNING":"SAFE"}
+function status(msg){const el=document.getElementById('statusBar');el.textContent=msg;el.classList.toggle('on',!!msg)}
+function setP(p){document.getElementById('prog-bar').style.width=p+'%';document.getElementById('pct').textContent=Math.round(p)+'%'}
+
+function zoneClick(){
+  if(scanning)return;
+  if(!hasMedia)document.getElementById('fInput').click();
+}
+
+function onFile(e){
+  const f=e.target.files[0];if(!f)return;
+  const url=URL.createObjectURL(f);
+  const img=document.getElementById('prev');
+  img.src=url;img.style.display='block';
+  document.getElementById('hint').style.display='none';
+  document.getElementById('bReset').classList.add('on');
+  hasMedia=true;
+  status('✓ Image loaded — press RUN SCAN');
+  if(camStream)stopCam();
+}
+
+async function toggleCam(){
+  if(camStream){stopCam();return}
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280}}});
+    const v=document.getElementById('vid');
+    v.srcObject=camStream;v.style.display='block';
+    document.getElementById('hint').style.display='none';
+    document.getElementById('prev').style.display='none';
+    document.getElementById('bCam').style.display='none';
+    document.getElementById('bUp').style.display='none';
+    document.getElementById('bStopCam').classList.add('on');
+    document.getElementById('bReset').classList.add('on');
+    hasMedia=true;
+    status('📷 Camera active — position shelf in frame then hit RUN SCAN');
+  }catch(err){
+    status('⚠ Camera permission denied. Please allow camera access in browser settings.');
+  }
+}
+
+function stopCam(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}
+  const v=document.getElementById('vid');v.style.display='none';v.srcObject=null;
+  document.getElementById('bStopCam').classList.remove('on');
+  document.getElementById('bCam').style.display='block';
+  document.getElementById('bUp').style.display='block';
+  hasMedia=false;status('');
+}
+
+function startScan(){
+  if(scanning)return;
+  scanning=true;bId=Math.floor(Math.random()*9000)+1000;
+
+  // if camera active — capture frame
+  if(camStream){
+    const v=document.getElementById('vid');
+    const c=document.createElement('canvas');
+    c.width=v.videoWidth||640;c.height=v.videoHeight||480;
+    c.getContext('2d').drawImage(v,0,0);
+    const img=document.getElementById('prev');
+    img.src=c.toDataURL('image/jpeg');img.style.display='block';
+    v.style.display='none';
+    stopCam();
+  }
+
+  document.getElementById('bScan').disabled=true;
+  document.getElementById('bScan').textContent='SCANNING...';
+  document.getElementById('beam').classList.add('on');
+  document.getElementById('prog-wrap').classList.add('on');
+  document.getElementById('rEmpty').style.display='none';
+  document.getElementById('rScanning').classList.add('on');
+  document.getElementById('scanMeta').textContent='';
+  status('');
+
+  const stages=[
+    {at:20,msg:'🔍 Detecting products in frame...'},
+    {at:45,msg:'📅 Running OCR on expiry labels...'},
+    {at:70,msg:'⚖ Classifying risk levels...'},
+    {at:90,msg:'📋 Building inwarding report...'
